@@ -100,7 +100,7 @@ class VDP_OT_actions(Operator):
 #   Drawing
 # -------------------------------------------------------------------
 
-class VDP_UL_items(UIList):
+class VDP_UL_wheels(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         split = layout.split(factor=0.3)
         split.label(text="Index: %d" % (index))
@@ -114,7 +114,7 @@ class VDP_UL_items(UIList):
 class VDP_PT_AddRig(Panel):
     """Adds a vdp panel to the TEXT_EDITOR"""
     bl_label = "Rig Options"
-    bl_idname = "OBJECT_PT_addrig"
+    bl_idname = "OBJECT_PT_addRig"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'Physics Vehicles'
@@ -123,10 +123,14 @@ class VDP_PT_AddRig(Panel):
         layout = self.layout
         scn = bpy.context.scene
 
+        layout.label(text="Click do add a rig for the car wow")
+
+        # The list of object
         rows = 2
         row = layout.row()
-        row.template_list("VDP_UL_items", "", scn, "vdp", scn, "vdp_index", rows=rows)
+        row.template_list("VDP_UL_wheels", "", scn, "vdp", scn, "vdp_index", rows=rows)
 
+        # The buttons that allow control over the list
         col = row.column(align=True)
         col.operator("vdp.list_action", icon='ZOOM_IN', text="").action = 'ADD'
         col.operator("vdp.list_action", icon='ZOOM_OUT', text="").action = 'REMOVE'
@@ -147,7 +151,7 @@ class RigOptionsProperties(PropertyGroup):
 class RigOptions(Panel):
     """Creates a Panel in the Object properties window"""
     bl_label = "Rig Options"
-    bl_idname = "OBJECT_PT_addrig"
+    bl_idname = "OBJECT_PT_rigOptions"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'Physics Vehicles'
@@ -157,25 +161,12 @@ class RigOptions(Panel):
         scene = context.scene
         obj = context.object
 
-        rigOptionsPropertiesReference = scene.rigOptionsPropertiesReference_
+        # rigOptionsPropertiesReference = scene.rigOptionsPropertiesReference_
 
-        layout.label(text="Click do add a rig for the car wow")
         # row.operator("object.add_list_item", text="Add List Item")
 
         layout.label(text="Set the number of axles")
 
-
-        rows = 2
-        row = layout.row()
-        row.template_list("VDP_UL_items", "", scene, "vdp", scene, "vdp_index", rows=rows)        
-
-        row = layout.row()
-        col = row.column(align=True)
-        col.operator("vdp.list_action", icon='ZOOM_IN', text="").action = 'ADD'
-        col.operator("vdp.list_action", icon='ZOOM_OUT', text="").action = 'REMOVE'
-        col.separator()
-        col.operator("vdp.list_action", icon='TRIA_UP', text="").action = 'UP'
-        col.operator("vdp.list_action", icon='TRIA_DOWN', text="").action = 'DOWN'
 
         
 #        row = layout.row()
@@ -212,7 +203,7 @@ class VDP_objectCollection(PropertyGroup):
 
 classes = (
     VDP_OT_actions,
-    VDP_UL_items,
+    VDP_UL_wheels,
     VDP_PT_AddRig,
     VDP_objectCollection,
     RigOptionsProperties,
@@ -308,7 +299,7 @@ if __name__ == "__main__":
 #         return {"FINISHED"}
 
 
-# class VDP_UL_items(UIList):
+# class VDP_UL_wheels(UIList):
 #     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
 #         split = layout.split(factor=0.3)
 #         split.label(text="Index: %d" % (index))
@@ -336,7 +327,7 @@ if __name__ == "__main__":
 # # Declare the classes to be registered, then register and unregister said classes
 # classes = [
 #     VDP_OT_actions,
-#     VDP_UL_items,
+#     VDP_UL_wheels,
 #     RigOptionsProperties,
 #     RigOptions,
 #     Controls
