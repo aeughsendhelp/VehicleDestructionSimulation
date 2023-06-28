@@ -13,6 +13,9 @@ bl_info={
 
 import bpy
 import bmesh
+import math
+import mathutils
+from mathutils import Euler
 from bpy.types import Panel, Operator, PropertyGroup, UIList
 from bpy.props import EnumProperty, PointerProperty, StringProperty, FloatProperty, IntProperty, FloatVectorProperty, BoolProperty, BoolVectorProperty, CollectionProperty
 from mathutils import Vector
@@ -43,6 +46,28 @@ class VDS_OT_AddRig(Operator):
 
             collection.objects.link(obj)
 
+        def rotateObject(x, y, z, obj):
+            eul = mathutils.Euler((math.radians(x), math.radians(y), math.radians(z)), 'XYZ')
+
+            if obj.rotation_mode == "QUATERNION":
+                obj.rotation_quaternion = eul.to_quaternion()
+            elif obj.rotation_mode == "AXIS_ANGLE":
+                q = eul.to_quaternion()
+                obj.rotation_axis_angle[0]  = q.angle
+                obj.rotation_axis_angle[1:] = q.axis
+            else:
+                obj.rotation_euler = eul if eul.order == obj.rotation_mode else(
+                    eul.to_quaternion().to_euler(obj.rotation_mode))
+        
+        def keepTransformParent(obj, parent):
+            obj.parent = parent
+            obj.matrix_parent_inverse = parent.matrix_world.inverted()
+
+        def selectObject(obj):
+            bpy.ops.object.select_all(action='DESELECT')
+            obj.select_set(True)
+            bpy.context.view_layer.objects.active = obj
+
         scene = context.scene
 
         # Parent
@@ -72,6 +97,7 @@ class VDS_OT_AddRig(Operator):
         deformCollection = bpy.data.collections.new("Deform")
         parentCollection.children.link(deformCollection)
         deformCollection.color_tag = "COLOR_05"
+        deformCollection.hide_render = True
         # Children
         bodyDeformCollection = bpy.data.collections.new("Body Deform")
         deformCollection.children.link(bodyDeformCollection)
@@ -90,6 +116,7 @@ class VDS_OT_AddRig(Operator):
         rigidbodyCollection = bpy.data.collections.new("Rigidbody")
         parentCollection.children.link(rigidbodyCollection)
         rigidbodyCollection.color_tag = "COLOR_05"
+        rigidbodyCollection.hide_render = True
         # Children
         bodyRigidbodyCollection = bpy.data.collections.new("Body Rigidbody")
         rigidbodyCollection.children.link(bodyRigidbodyCollection)
@@ -108,6 +135,7 @@ class VDS_OT_AddRig(Operator):
         constraintCollection = bpy.data.collections.new("Constraint")
         parentCollection.children.link(constraintCollection)
         constraintCollection.color_tag = "COLOR_05"
+        constraintCollection.hide_render = True
         # Children
         bodyConstraintCollection = bpy.data.collections.new("Body Constraint")
         constraintCollection.children.link(bodyConstraintCollection)
@@ -127,35 +155,71 @@ class VDS_OT_AddRig(Operator):
         body = scene.rigTool.Body
         moveToCollection(body, bodyMeshCollection)
 
+        # Rig
+        bpy.ops.mesh.primitive_plane_add(size=1, enter_editmode=False, align='WORLD', location=(body.location), scale=(1, 1, 1))
+        rig = bpy.context.active_object
+        scaleVector = Vector((body.dimensions.x * 2, body.dimensions.y * 1.5, 0))
+        rig.scale = scaleVector
+        rig.display_type = 'WIRE'
+        bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        moveToCollection(rig, parentCollection)
+
         # Body Rigidbody
-        bpy.ops.object.select_all(action='DESELECT')
-        body.select_set(True)
-        bpy.context.view_layer.objects.active = body
+        selectObject(body)
 
         bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((0, 0, 0), (0, 0, 0), (0, 0, 0)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_elements":{'INCREMENT'}, "use_snap_project":False, "snap_target":'CLOSEST', "use_snap_self":True, "use_snap_edit":True, "use_snap_nonedit":True, "use_snap_selectable":False, "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
         bodyRigidbody = bpy.context.active_object
         bodyRigidbody.name = body.name + " Rigidbody"
         bodyRigidbody.display_type = 'WIRE'
+        bodyRigidbody.parent = rig
+        bodyRigidbody.matrix_parent_inverse = rig.matrix_world.inverted()
+        bodyRigidbody.scale = Vector((0.75, 0.75, 0.75))
+        bpy.ops.object.transform_apply(location=False, rotation=True, scale=True, isolate_users=True)
+
         moveToCollection(bodyRigidbody, bodyRigidbodyCollection)
 
-        bm = bmesh.new()
-        bm.from_mesh(bodyRigidbody.data)
-        bmesh.ops.convex_hull(bm, input=bm.verts)
-        bm.to_mesh(bodyRigidbody.data)
+        # bm = bmesh.new()
+        # bm.from_mesh(bodyRigidbody.data)
+        # bmesh.ops.convex_hull(bm, input=bm.verts)
+        # bm.to_mesh(bodyRigidbody.data)
 
         bpy.ops.rigidbody.object_add()
         bpy.context.object.rigid_body.mass = 1500
 
+        selectObject(bodyRigidbody)
+        bpy.ops.object.modifier_add(type='REMESH')
+        bpy.context.object.modifiers["Remesh"].mode = 'SHARP'
+        bpy.context.object.modifiers["Remesh"].octree_depth = 3
+        bpy.ops.object.convert(target='MESH')
+
+        keepTransformParent(body, bodyRigidbody)
+
         # Body Deform
-        bpy.ops.object.select_all(action='DESELECT')
-        body.select_set(True)
-        bpy.context.view_layer.objects.active = body
+        selectObject(body)
 
         bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((0, 0, 0), (0, 0, 0), (0, 0, 0)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_elements":{'INCREMENT'}, "use_snap_project":False, "snap_target":'CLOSEST', "use_snap_self":True, "use_snap_edit":True, "use_snap_nonedit":True, "use_snap_selectable":False, "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
         bodyDeform = bpy.context.active_object
         bodyDeform.name = body.name + " Deform"
         bodyDeform.display_type = 'WIRE'
-        # moveToCollection(bodyDeform, bodyDeformCollection)
+        keepTransformParent(bodyDeform, rig)
+        moveToCollection(bodyDeform, bodyDeformCollection)
+
+        selectObject(bodyRigidbody)
+        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((0, 0, 0), (0, 0, 0), (0, 0, 0)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_elements":{'INCREMENT'}, "use_snap_project":False, "snap_target":'CLOSEST', "use_snap_self":True, "use_snap_edit":True, "use_snap_nonedit":True, "use_snap_selectable":False, "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
+        temporaryBodyRigidBody = bpy.context.active_object
+        selectObject(temporaryBodyRigidBody)
+
+        # tempbm = bmesh.new()
+        # tempbm.from_mesh(temporaryBodyRigidBody.data)
+        # bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=1, use_grid_fill=True)
+        # bmesh.ops.convex_hull(tempbm, input=tempbm.verts)
+        # tempbm.to_mesh(temporaryBodyRigidBody.data)
+
+        tempVertexGroup = temporaryBodyRigidBody.vertex_groups.new(name = 'ClothPin')
+        vertexData = []
+        for i in range(1,len(temporaryBodyRigidBody.data.vertices)):
+            vertexData.append(i)
+        tempVertexGroup.add(vertexData, 1.0, 'ADD')
 
         bm = bmesh.new()
         bm.from_mesh(bodyDeform.data)
@@ -163,18 +227,59 @@ class VDS_OT_AddRig(Operator):
         bmesh.ops.convex_hull(bm, input=bm.verts)
         bm.to_mesh(bodyDeform.data)
 
+        selectObject(bodyDeform)
         bpy.ops.object.modifier_add(type='REMESH')
         bpy.context.object.modifiers["Remesh"].mode = 'VOXEL'
         bpy.context.object.modifiers["Remesh"].voxel_size = 0.2
         bpy.ops.object.modifier_add(type='SHRINKWRAP')
         bpy.context.object.modifiers["Shrinkwrap"].target = body
         bpy.ops.object.convert(target='MESH')
+
+        selectObject(bodyDeform)
+        bpy.context.view_layer.objects.active = bodyDeform
+        temporaryBodyRigidBody.select_set(True)
+        bpy.ops.object.join()
+
+        keepTransformParent(bodyDeform, bodyRigidbody)
+
         bpy.ops.object.modifier_add(type='CLOTH')
+        bodyDeform.modifiers["Cloth"].settings.vertex_group_mass = "ClothPin"
+        bpy.context.object.modifiers["Cloth"].settings.time_scale = 5
+        bodyDeform.modifiers["Cloth"].settings.tension_stiffness = 10000
+        bodyDeform.modifiers["Cloth"].settings.compression_stiffness = 200
+        bodyDeform.modifiers["Cloth"].settings.shear_stiffness = 200
+        bodyDeform.modifiers["Cloth"].settings.bending_stiffness = 100
+        bodyDeform.modifiers["Cloth"].settings.use_internal_springs = True
+        bodyDeform.modifiers["Cloth"].collision_settings.use_self_collision = True
+        bodyDeform.modifiers["Cloth"].settings.mass = 0.1
+        bodyDeform.modifiers["Cloth"].settings.air_damping = 0
+        bodyDeform.modifiers["Cloth"].settings.tension_damping = 50
+        bodyDeform.modifiers["Cloth"].settings.compression_damping = 50
+        bodyDeform.modifiers["Cloth"].settings.shear_damping = 50
+        bodyDeform.modifiers["Cloth"].settings.bending_damping = 0
+        bodyDeform.modifiers["Cloth"].settings.internal_spring_max_diversion = 0.000174533
+        bodyDeform.modifiers["Cloth"].settings.internal_tension_stiffness = 1
+        bodyDeform.modifiers["Cloth"].settings.internal_compression_stiffness = 0.001
+        bodyDeform.modifiers["Cloth"].settings.internal_tension_stiffness_max = 590
+        bodyDeform.modifiers["Cloth"].settings.internal_compression_stiffness_max = 590
+        bodyDeform.modifiers["Cloth"].collision_settings.self_distance_min = 0.003
+        bodyDeform.modifiers["Cloth"].collision_settings.self_impulse_clamp = 100
+        bodyDeform.modifiers["Cloth"].settings.effector_weights.gravity = 0
+
+
+        selectObject(body)
+        bpy.ops.object.modifier_add(type='MESH_DEFORM')
+        body.modifiers["MeshDeform"].object = bodyDeform
+        bpy.ops.object.meshdeform_bind(modifier="MeshDeform")
+        body.modifiers["MeshDeform"].show_viewport = False
 
 
         for wheel in scene.vds:
-            # print(wheel.obj.location)
             # Wheel
+            selectObject(wheel.obj)
+        
+            bpy.ops.object.transform_apply(location=False, rotation=True, scale=True, isolate_users=True)
+
             moveToCollection(wheel.obj, wheelMeshCollection)
 
             # Wheel Rigidbody
@@ -183,8 +288,13 @@ class VDS_OT_AddRig(Operator):
             wheelRigidbody = bpy.context.active_object
             wheelRigidbody.name = wheel.obj.name + " Rigidbody"
             wheelRigidbody.display_type = 'WIRE'
+
+            keepTransformParent(wheelRigidbody, rig)
+
             moveToCollection(wheelRigidbody, wheelRigidbodyCollection)
-            wheel.parent = wheelRigidbody
+            
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+            keepTransformParent(wheel.obj, wheelRigidbody)
 
             bpy.ops.rigidbody.object_add()
             bpy.context.object.rigid_body.mass = 100
@@ -194,6 +304,10 @@ class VDS_OT_AddRig(Operator):
             bpy.ops.object.empty_add(type='SINGLE_ARROW', align='WORLD', location=(wheel.obj.location), rotation=(0, -1.5708, 0), scale=(1, 1, 1))
             hingeConstraint = bpy.context.active_object
             hingeConstraint.name = wheel.obj.name + " Hinge"
+            keepTransformParent(hingeConstraint, rig)
+
+            # rotateObject(0, 90, 0, hingeConstraint)
+            # hingeConstraint.rotation_euler = Euler((math.radians(0), math.radians(90), math.radians(0)), 'XYZ' )
             moveToCollection(hingeConstraint, wheelConstraintCollection)
 
             bpy.ops.rigidbody.constraint_add()
@@ -453,6 +567,7 @@ class VDS_PT_Rig(Panel):
     bl_idname = "OBJECT_PT_rig"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
+    bl_context = "objectmode"
     bl_category = 'Vehicles Sim'
 
     def draw(self, context):
