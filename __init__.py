@@ -152,7 +152,7 @@ class VDS_OT_AddRig(Operator):
 
         # Body
         bpy.ops.object.select_all(action='DESELECT')
-        body = scene.rigTool.Body
+        body = scene.bodyTool.Body
         moveToCollection(body, bodyMeshCollection)
 
         # Rig
@@ -204,23 +204,6 @@ class VDS_OT_AddRig(Operator):
         keepTransformParent(bodyDeform, rig)
         moveToCollection(bodyDeform, bodyDeformCollection)
 
-        selectObject(bodyRigidbody)
-        bpy.ops.object.duplicate_move(OBJECT_OT_duplicate={"linked":False, "mode":'TRANSLATION'}, TRANSFORM_OT_translate={"value":(0, 0, 0), "orient_type":'GLOBAL', "orient_matrix":((0, 0, 0), (0, 0, 0), (0, 0, 0)), "orient_matrix_type":'GLOBAL', "constraint_axis":(False, False, False), "mirror":False, "use_proportional_edit":False, "proportional_edit_falloff":'SMOOTH', "proportional_size":1, "use_proportional_connected":False, "use_proportional_projected":False, "snap":False, "snap_elements":{'INCREMENT'}, "use_snap_project":False, "snap_target":'CLOSEST', "use_snap_self":True, "use_snap_edit":True, "use_snap_nonedit":True, "use_snap_selectable":False, "snap_point":(0, 0, 0), "snap_align":False, "snap_normal":(0, 0, 0), "gpencil_strokes":False, "cursor_transform":False, "texture_space":False, "remove_on_cancel":False, "view2d_edge_pan":False, "release_confirm":False, "use_accurate":False, "use_automerge_and_split":False})
-        temporaryBodyRigidBody = bpy.context.active_object
-        selectObject(temporaryBodyRigidBody)
-
-        # tempbm = bmesh.new()
-        # tempbm.from_mesh(temporaryBodyRigidBody.data)
-        # bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=1, use_grid_fill=True)
-        # bmesh.ops.convex_hull(tempbm, input=tempbm.verts)
-        # tempbm.to_mesh(temporaryBodyRigidBody.data)
-
-        tempVertexGroup = temporaryBodyRigidBody.vertex_groups.new(name = 'ClothPin')
-        vertexData = []
-        for i in range(1,len(temporaryBodyRigidBody.data.vertices)):
-            vertexData.append(i)
-        tempVertexGroup.add(vertexData, 1.0, 'ADD')
-
         bm = bmesh.new()
         bm.from_mesh(bodyDeform.data)
         # bmesh.ops.subdivide_edges(bm, edges=bm.edges, cuts=1, use_grid_fill=True)
@@ -234,44 +217,38 @@ class VDS_OT_AddRig(Operator):
         bpy.ops.object.modifier_add(type='SHRINKWRAP')
         bpy.context.object.modifiers["Shrinkwrap"].target = body
         bpy.ops.object.convert(target='MESH')
-
-        selectObject(bodyDeform)
-        bpy.context.view_layer.objects.active = bodyDeform
-        temporaryBodyRigidBody.select_set(True)
-        bpy.ops.object.join()
+        bpy.ops.transform.resize(value=(scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier))
 
         keepTransformParent(bodyDeform, bodyRigidbody)
 
-        bpy.ops.object.modifier_add(type='CLOTH')
-        bodyDeform.modifiers["Cloth"].settings.vertex_group_mass = "ClothPin"
-        bpy.context.object.modifiers["Cloth"].settings.time_scale = 5
-        bodyDeform.modifiers["Cloth"].settings.tension_stiffness = 10000
-        bodyDeform.modifiers["Cloth"].settings.compression_stiffness = 200
-        bodyDeform.modifiers["Cloth"].settings.shear_stiffness = 200
-        bodyDeform.modifiers["Cloth"].settings.bending_stiffness = 100
-        bodyDeform.modifiers["Cloth"].settings.use_internal_springs = True
-        bodyDeform.modifiers["Cloth"].collision_settings.use_self_collision = True
-        bodyDeform.modifiers["Cloth"].settings.mass = 0.1
-        bodyDeform.modifiers["Cloth"].settings.air_damping = 0
-        bodyDeform.modifiers["Cloth"].settings.tension_damping = 50
-        bodyDeform.modifiers["Cloth"].settings.compression_damping = 50
-        bodyDeform.modifiers["Cloth"].settings.shear_damping = 50
-        bodyDeform.modifiers["Cloth"].settings.bending_damping = 0
-        bodyDeform.modifiers["Cloth"].settings.internal_spring_max_diversion = 0.000174533
-        bodyDeform.modifiers["Cloth"].settings.internal_tension_stiffness = 1
-        bodyDeform.modifiers["Cloth"].settings.internal_compression_stiffness = 0.001
-        bodyDeform.modifiers["Cloth"].settings.internal_tension_stiffness_max = 590
-        bodyDeform.modifiers["Cloth"].settings.internal_compression_stiffness_max = 590
-        bodyDeform.modifiers["Cloth"].collision_settings.self_distance_min = 0.003
-        bodyDeform.modifiers["Cloth"].collision_settings.self_impulse_clamp = 100
-        bodyDeform.modifiers["Cloth"].settings.effector_weights.gravity = 0
-
-
         selectObject(body)
+        bpy.ops.object.modifier_add(type='SUBSURF')
+        bpy.context.object.modifiers["Subdivision"].subdivision_type = 'SIMPLE'
+        bpy.context.object.modifiers["Subdivision"].levels = 4
+        bpy.context.object.modifiers["Subdivision"].render_levels = 4
+
         bpy.ops.object.modifier_add(type='MESH_DEFORM')
         body.modifiers["MeshDeform"].object = bodyDeform
         bpy.ops.object.meshdeform_bind(modifier="MeshDeform")
-        body.modifiers["MeshDeform"].show_viewport = False
+        
+        # body.modifiers["MeshDeform"].show_viewport = False
+
+        selectObject(bodyDeform)
+        bpy.ops.object.modifier_add(type='DYNAMIC_PAINT')
+        bpy.ops.dpaint.type_toggle(type='CANVAS')
+        bpy.context.object.modifiers["Dynamic Paint"].canvas_settings.canvas_surfaces["Surface"].surface_type = 'WEIGHT'
+        bpy.ops.dpaint.output_toggle(output='A')
+
+        cloudTexture = bpy.data.textures.new('CarDisplacement', type = 'CLOUDS')
+        dispMod = bodyDeform.modifiers.new("Displace", type='DISPLACE')
+        dispMod.texture = cloudTexture
+        bpy.data.textures["CarDisplacement"].noise_scale = 1.5
+        bpy.data.textures["CarDisplacement"].noise_depth = 2
+        bpy.data.textures["CarDisplacement"].contrast = 1.5
+        bodyDeform.modifiers["Displace"].strength = 1
+        bodyDeform.modifiers["Displace"].mid_level = 0.8
+
+        bpy.context.object.modifiers["Displace"].vertex_group = "dp_weight"
 
 
         for wheel in scene.vds:
@@ -317,7 +294,6 @@ class VDS_OT_AddRig(Operator):
 
 
         return{'FINISHED'}
-
 
 class VDS_OT_actions(Operator):
     """Move items up and down, add and remove"""
@@ -538,24 +514,54 @@ class VDS_PT_Controls(Panel):
 #         split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
                         
 #     def invoke(self, context, event):
-#         pass   
+#         pass
 
-# UI List of all the assigned wheels
-class VDS_UL_wheels(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        obj = item.obj
-        vds_icon = "OUTLINER_OB_%s" % obj.type
-        split = layout.split(factor=0.1)
-        split.label(text="%d" % (index))
-        split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                
-    def invoke(self, context, event):
-        pass   
+# Properties for the Rig panel
+class VDS_PG_BodyProperties(PropertyGroup):
+    Body : bpy.props.PointerProperty(
+        name = 'Body',
+        description = '',
+        type = bpy.types.Object
+    )
+    Weight : bpy.props.FloatProperty(
+        name = 'Weight',
+        description = "Vehicle Rigidbody Weight",
+        default = 1500,
+        step = 100,
+    )
+    DeformSpacingMultiplier : bpy.props.FloatProperty(
+        name = 'Deform Spacing Multiplier',
+        description = "Spacing between the deform mesh and the regular mesh",
+        default = 1.1,
+        # step = 10,
+    )
+
+# Panel that will display the rig menu
+class VDS_PT_Body(Panel):
+    """The Body Panel"""
+    bl_label = "Body"
+    bl_idname = "OBJECT_PT_body"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_context = "objectmode"
+    bl_category = 'Vehicles Sim'
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        bodyTool = scene.bodyTool
+
+        # Generate Rig button
+        layout.label(text="Click do add a rig for the car wow")
+
+        layout.prop(bodyTool, "Body")
+        layout.prop(bodyTool, "Weight")
+        layout.prop(bodyTool, "DeformSpacingMultiplier")
 
 # Properties for the Rig panel
 class VDS_PG_RigProperties(PropertyGroup):
-    Body : bpy.props.PointerProperty(
-        name = 'FL Wheel',
+    Body1 : bpy.props.PointerProperty(
+        name = 'Body',
         description = '',
         type = bpy.types.Object
     )
@@ -579,8 +585,6 @@ class VDS_PT_Rig(Panel):
         layout.label(text="Click do add a rig for the car wow")
         layout.operator("vds.add_rig", text="Generate Rig", icon='AUTO')
 
-        layout.prop(rigTool, "Body")
-
         # # Test Draw button
         # layout.label(text="Click to refresh draw the things wowza")
         # layout.operator("vds.test_draw", text="Refresh", icon='SPHERE')
@@ -596,22 +600,20 @@ class VDS_PT_Rig(Panel):
             # row = layout.row()
             # row.template_list("VDS_UL_doors", "", scene, "vds", scene, "doorsIndex", rows=rows)
         # Wheels
-        layout.label(text="Wheel List")
-        rows = 2
-        row = layout.row()
-        row.template_list("VDS_UL_wheels", "", scene, "vds", scene, "wheelsIndex", rows=rows)
 
-        # Buttons that control the list
-        col = row.column(align=True)
-        col.operator("vds.list_action", icon='ADD', text="").action = 'ADD'
-        col.operator("vds.list_action", icon='REMOVE', text="").action = 'REMOVE'
-        col.separator()
-        col.operator("vds.list_action", icon='TRIA_UP', text="").action = 'UP'
-        col.operator("vds.list_action", icon='TRIA_DOWN', text="").action = 'DOWN'
-        col.separator()
-        col.operator("vds.add_viewport_selection", icon="HAND") #LINENUMBERS_OFF, ANIM
         # col.operator("vds.delete_object", icon="X") #LINENUMBERS_OFF, ANIM
 
+# UI List of all the assigned wheels
+class VDS_UL_wheels(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        obj = item.obj
+        vds_icon = "OUTLINER_OB_%s" % obj.type
+        split = layout.split(factor=0.1)
+        split.label(text="%d" % (index))
+        split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
+                
+    def invoke(self, context, event):
+        pass   
 
 class VDS_PT_Wheel(Panel):
     """The Wheel Panel"""
@@ -630,6 +632,21 @@ class VDS_PT_Wheel(Panel):
 
         wheelTool = scene.wheelTool
       
+        layout.label(text="Wheel List")
+        rows = 2
+        row = layout.row()
+        row.template_list("VDS_UL_wheels", "", scene, "vds", scene, "wheelsIndex", rows=rows)
+
+        # Buttons that control the list
+        col = row.column(align=True)
+        col.operator("vds.list_action", icon='ADD', text="").action = 'ADD'
+        col.operator("vds.list_action", icon='REMOVE', text="").action = 'REMOVE'
+        col.separator()
+        col.operator("vds.list_action", icon='TRIA_UP', text="").action = 'UP'
+        col.operator("vds.list_action", icon='TRIA_DOWN', text="").action = 'DOWN'
+        col.separator()
+        col.operator("vds.add_viewport_selection", icon="HAND") #LINENUMBERS_OFF, ANIM
+
         # Suspension
         # layout.prop(wheelTool, "obj")
         layout.prop(wheelTool, "suspensionheight")
@@ -681,7 +698,6 @@ class VDS_PG_wheelCollection(PropertyGroup):
         step = 100,
     )
 
-
 # -------------------------------------------------------------------
 #   Register & Unregister
 # -------------------------------------------------------------------
@@ -702,12 +718,15 @@ classes = (
     # VDS_UL_doors,
     VDS_PG_RigProperties,
     VDS_PT_Rig,
+    # Body
+    VDS_PG_BodyProperties,
+    VDS_PT_Body,
     # Wheel
+    VDS_PG_wheelCollection,
     VDS_PT_Wheel,
     # Collection
     # VDS_PG_bodyCollection,
     # VDS_PG_doorCollection,
-    VDS_PG_wheelCollection,
 )
 
 def register():
@@ -717,10 +736,11 @@ def register():
 
     # Custom scene properties
     bpy.types.Scene.vds = CollectionProperty(type=VDS_PG_wheelCollection)
-    bpy.types.Scene.wheelTool = PointerProperty(type=VDS_PG_wheelCollection)
-    bpy.types.Scene.wheelsIndex = IntProperty()
-    bpy.types.Scene.rigTool = PointerProperty(type=VDS_PG_RigProperties)
     bpy.types.Scene.controlsTool = PointerProperty(type=VDS_PG_ControlsProperties)
+    bpy.types.Scene.bodyTool = PointerProperty(type=VDS_PG_BodyProperties)
+    bpy.types.Scene.rigTool = PointerProperty(type=VDS_PG_RigProperties)
+    bpy.types.Scene.wheelsIndex = IntProperty()
+    bpy.types.Scene.wheelTool = PointerProperty(type=VDS_PG_wheelCollection)
 
 def unregister():
     from bpy.utils import unregister_class
@@ -728,9 +748,11 @@ def unregister():
         unregister_class(cls)
 
     del bpy.types.Scene.vds
-    del bpy.types.Scene.wheelsIndex
-    del bpy.types.Scene.rigTool
     del bpy.types.Scene.controlsTool
+    del bpy.types.Scene.bodyTool
+    del bpy.types.Scene.rigTool
+    del bpy.types.Scene.wheelsIndex
+    del bpy.types.Scene.wheelTool
 
 if __name__ == "__main__":
     register()
