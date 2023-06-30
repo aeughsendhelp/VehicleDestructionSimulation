@@ -33,8 +33,6 @@ class VDS_OT_AddRig(Operator):
     bl_description = "Remove object from scene"
     bl_options = {'REGISTER', 'UNDO'}
 
-
-
     @classmethod
     def poll(cls, context):
         return bool(context.scene.vds)
