@@ -160,6 +160,7 @@ class VDS_OT_AddRig(Operator):
         rig.scale = scaleVector
         rig.display_type = 'WIRE'
         bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+        rig.name = body.name + " Rig"
         moveToCollection(rig, parentCollection)
 
         # Body Rigidbody
@@ -171,7 +172,8 @@ class VDS_OT_AddRig(Operator):
         bodyRigidbody.display_type = 'WIRE'
         bodyRigidbody.parent = rig
         bodyRigidbody.matrix_parent_inverse = rig.matrix_world.inverted()
-        bodyRigidbody.scale = Vector((0.75, 0.75, 0.75))
+        # Needs a better scaling system so that nothing ends up intersecting
+        bodyRigidbody.scale = Vector((0.5, 0.5, 0.5))
         bpy.ops.object.transform_apply(location=False, rotation=True, scale=True, isolate_users=True)
 
         moveToCollection(bodyRigidbody, bodyRigidbodyCollection)
@@ -211,19 +213,24 @@ class VDS_OT_AddRig(Operator):
         selectObject(bodyDeform)
         bpy.ops.object.modifier_add(type='REMESH')
         bpy.context.object.modifiers["Remesh"].mode = 'VOXEL'
-        bpy.context.object.modifiers["Remesh"].voxel_size = 0.2
+        bpy.context.object.modifiers["Remesh"].voxel_size = scene.bodyTool.DeformSubdivisions
         bpy.ops.object.modifier_add(type='SHRINKWRAP')
         bpy.context.object.modifiers["Shrinkwrap"].target = body
         bpy.ops.object.convert(target='MESH')
         bpy.ops.transform.resize(value=(scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier))
 
+        bpy.ops.object.modifier_add(type='SMOOTH')
+        bpy.context.object.modifiers["Smooth"].factor = 4
+        bpy.ops.object.modifier_apply(modifier="Smooth")
+
         keepTransformParent(bodyDeform, bodyRigidbody)
 
         selectObject(body)
-        bpy.ops.object.modifier_add(type='SUBSURF')
-        bpy.context.object.modifiers["Subdivision"].subdivision_type = 'SIMPLE'
-        bpy.context.object.modifiers["Subdivision"].levels = 4
-        bpy.context.object.modifiers["Subdivision"].render_levels = 4
+        # The fuck was I thinking here? This is going to add unneccessary vertices and possibly also break the mesh. Maybe it was because of my test mesh? Not sure
+        # bpy.ops.object.modifier_add(type='SUBSURF')
+        # bpy.context.object.modifiers["Subdivision"].subdivision_type = 'SIMPLE'
+        # bpy.context.object.modifiers["Subdivision"].levels = scene.bodyTool.DeformSubdivisions
+        # bpy.context.object.modifiers["Subdivision"].render_levels = scene.bodyTool.DeformSubdivisions
 
         bpy.ops.object.modifier_add(type='MESH_DEFORM')
         body.modifiers["MeshDeform"].object = bodyDeform
@@ -244,9 +251,11 @@ class VDS_OT_AddRig(Operator):
         bpy.data.textures["CarDisplacement"].noise_depth = 2
         bpy.data.textures["CarDisplacement"].contrast = 1.5
         bodyDeform.modifiers["Displace"].strength = 1
-        bodyDeform.modifiers["Displace"].mid_level = 0.8
+        bodyDeform.modifiers["Displace"].mid_level = 0.85
 
         bpy.context.object.modifiers["Displace"].vertex_group = "dp_weight"
+
+        bpy.ops.object.modifier_add(type='CORRECTIVE_SMOOTH')
 
 
         for wheel in scene.vds:
@@ -259,13 +268,11 @@ class VDS_OT_AddRig(Operator):
 
             # Wheel Rigidbody
             rotatedVector = Vector((wheel.obj.dimensions.z, wheel.obj.dimensions.y, wheel.obj.dimensions.x))/2
-            bpy.ops.mesh.primitive_cylinder_add(vertices=16, enter_editmode=False, align='WORLD', location=(wheel.obj.location), rotation=(0, 1.5708, 0), scale=(rotatedVector))
+            bpy.ops.mesh.primitive_cylinder_add(vertices=32, enter_editmode=False, align='WORLD', location=(wheel.obj.location), rotation=(0, 1.5708, 0), scale=(rotatedVector))
             wheelRigidbody = bpy.context.active_object
             wheelRigidbody.name = wheel.obj.name + " Rigidbody"
             wheelRigidbody.display_type = 'WIRE'
-
             keepTransformParent(wheelRigidbody, rig)
-
             moveToCollection(wheelRigidbody, wheelRigidbodyCollection)
             
             bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
@@ -273,22 +280,94 @@ class VDS_OT_AddRig(Operator):
 
             bpy.ops.rigidbody.object_add()
             bpy.context.object.rigid_body.mass = 100
+            bpy.context.object.rigid_body.friction = 1
+            bpy.context.object.rigid_body.restitution = 0.2
+            bpy.context.object.rigid_body.linear_damping = 0.005
+            bpy.context.object.rigid_body.angular_damping = 0.001
 
+            # Suspension Rigidbody
+            if wheel.obj.location.x < body.location.x:
+                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x + 0.6, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, -0.392699, 0), scale=(0.5, 0.1, 0.1))
+            else:
+                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x - 0.6, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, 0.392699, 0), scale=(0.5, 0.1, 0.1))
 
-            # Hinge Constraints
+            suspensionRigidbody = bpy.context.active_object
+            selectObject(suspensionRigidbody)
+            keepTransformParent(suspensionRigidbody, rig)
+            moveToCollection(suspensionRigidbody, wheelRigidbodyCollection)
+            # Do or don't apply the rotation? I'm not sure it matters either way
+            bpy.ops.object.transform_apply(location=False, rotation=False, scale=True)
+
+            bpy.ops.rigidbody.object_add()
+            bpy.context.object.rigid_body.mass = 15
+
+            # Suspension Spring Constraint
+
+            bpy.ops.object.empty_add(type='SPHERE', align='WORLD', location=(wheel.obj.location), rotation=(0, 0, 0), scale=(1, 1, 1))
+            SuspensionConstraint = bpy.context.active_object
+            SuspensionConstraint.name = wheel.obj.name + " Suspension Spring"
+            keepTransformParent(SuspensionConstraint, rig)
+            moveToCollection(SuspensionConstraint, wheelConstraintCollection)
+ 
+            bpy.ops.rigidbody.constraint_add()
+            bpy.context.object.rigid_body_constraint.type = 'GENERIC_SPRING'
+            bpy.context.object.rigid_body_constraint.use_limit_ang_x = True
+            bpy.context.object.rigid_body_constraint.use_limit_ang_y = True
+            bpy.context.object.rigid_body_constraint.use_limit_ang_z = True
+            bpy.context.object.rigid_body_constraint.use_limit_lin_x = True
+            bpy.context.object.rigid_body_constraint.use_limit_lin_y = True
+            bpy.context.object.rigid_body_constraint.use_limit_lin_z = True
+            bpy.context.object.rigid_body_constraint.limit_ang_x_upper = 0
+            bpy.context.object.rigid_body_constraint.limit_ang_y_lower = 0
+            bpy.context.object.rigid_body_constraint.limit_ang_y_upper = 0
+            bpy.context.object.rigid_body_constraint.limit_ang_z_lower = 0
+            bpy.context.object.rigid_body_constraint.limit_ang_z_upper = 0
+            bpy.context.object.rigid_body_constraint.limit_ang_x_lower = 0
+            bpy.context.object.rigid_body_constraint.limit_lin_x_upper = 0
+            bpy.context.object.rigid_body_constraint.limit_lin_y_lower = 0
+            bpy.context.object.rigid_body_constraint.limit_lin_y_upper = 0
+            bpy.context.object.rigid_body_constraint.limit_lin_x_lower = 0
+            bpy.context.object.rigid_body_constraint.limit_lin_z_lower = -0.23
+            bpy.context.object.rigid_body_constraint.limit_lin_z_upper = 0.2
+            bpy.context.object.rigid_body_constraint.use_override_solver_iterations = True
+            bpy.context.object.rigid_body_constraint.solver_iterations = 300
+            bpy.context.object.rigid_body_constraint.use_spring_z = True
+            bpy.context.object.rigid_body_constraint.spring_stiffness_z = 50000
+            bpy.context.object.rigid_body_constraint.spring_damping_z = 1000
+            bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
+            bpy.context.object.rigid_body_constraint.object2 = bodyRigidbody
+
+            # Wheel Hinge Constraint
             bpy.ops.object.empty_add(type='SINGLE_ARROW', align='WORLD', location=(wheel.obj.location), rotation=(0, -1.5708, 0), scale=(1, 1, 1))
             hingeConstraint = bpy.context.active_object
             hingeConstraint.name = wheel.obj.name + " Hinge"
             keepTransformParent(hingeConstraint, rig)
-
-            # rotateObject(0, 90, 0, hingeConstraint)
-            # hingeConstraint.rotation_euler = Euler((math.radians(0), math.radians(90), math.radians(0)), 'XYZ' )
             moveToCollection(hingeConstraint, wheelConstraintCollection)
-
+ 
             bpy.ops.rigidbody.constraint_add()
             bpy.context.object.rigid_body_constraint.type = 'HINGE'
-            bpy.context.object.rigid_body_constraint.object1 = bodyRigidbody
+            bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
             bpy.context.object.rigid_body_constraint.object2 = wheelRigidbody
+
+
+
+            # Motor Constraints
+            # bpy.ops.object.empty_add(type='CONE', align='WORLD', location=(wheel.obj.location), rotation=(0, -1.5708, 0), scale=(1, 1, 1))
+            # bpy.context.object.empty_display_size = 0.3
+            # motorConstraint = bpy.context.active_object
+            # motorConstraint.name = wheel.obj.name + " Motor"
+            # rotateObject(0, 0, 90, motorConstraint)
+            # keepTransformParent(motorConstraint, rig)
+
+            # moveToCollection(motorConstraint, wheelConstraintCollection)
+
+            # bpy.ops.rigidbody.constraint_add()
+            # bpy.context.object.rigid_body_constraint.type = 'MOTOR'
+            # bpy.context.object.rigid_body_constraint.object1 = bodyRigidbody
+            # bpy.context.object.rigid_body_constraint.object2 = wheelRigidbody
+            # bpy.context.object.rigid_body_constraint.use_motor_ang = True
+            # bpy.context.object.rigid_body_constraint.motor_ang_target_velocity = 1e+08
+            # bpy.context.object.rigid_body_constraint.motor_ang_max_impulse = 1e+07
 
 
         return{'FINISHED'}
@@ -515,48 +594,6 @@ class VDS_PT_Controls(Panel):
 #         pass
 
 # Properties for the Rig panel
-class VDS_PG_BodyProperties(PropertyGroup):
-    Body : bpy.props.PointerProperty(
-        name = 'Body',
-        description = '',
-        type = bpy.types.Object
-    )
-    Weight : bpy.props.FloatProperty(
-        name = 'Weight',
-        description = "Vehicle Rigidbody Weight",
-        default = 1500,
-        step = 100,
-    )
-    DeformSpacingMultiplier : bpy.props.FloatProperty(
-        name = 'Deform Spacing Multiplier',
-        description = "Spacing between the deform mesh and the regular mesh",
-        default = 1.1,
-        # step = 10,
-    )
-
-# Panel that will display the rig menu
-class VDS_PT_Body(Panel):
-    """The Body Panel"""
-    bl_label = "Body"
-    bl_idname = "OBJECT_PT_body"
-    bl_space_type = 'VIEW_3D'
-    bl_region_type = 'UI'
-    bl_context = "objectmode"
-    bl_category = 'Vehicles Sim'
-
-    def draw(self, context):
-        layout = self.layout
-        scene = context.scene
-        bodyTool = scene.bodyTool
-
-        # Generate Rig button
-        layout.label(text="Click do add a rig for the car wow")
-
-        layout.prop(bodyTool, "Body")
-        layout.prop(bodyTool, "Weight")
-        layout.prop(bodyTool, "DeformSpacingMultiplier")
-
-# Properties for the Rig panel
 class VDS_PG_RigProperties(PropertyGroup):
     Body1 : bpy.props.PointerProperty(
         name = 'Body',
@@ -580,7 +617,7 @@ class VDS_PT_Rig(Panel):
         rigTool = scene.rigTool
 
         # Generate Rig button
-        layout.label(text="Click do add a rig for the car wow")
+        # layout.label(text="Click do add a rig for the car wow")
         layout.operator("vds.add_rig", text="Generate Rig", icon='AUTO')
 
         # # Test Draw button
@@ -600,6 +637,55 @@ class VDS_PT_Rig(Panel):
         # Wheels
 
         # col.operator("vds.delete_object", icon="X") #LINENUMBERS_OFF, ANIM
+
+# Properties for the Body panel
+class VDS_PG_BodyProperties(PropertyGroup):
+    Body : bpy.props.PointerProperty(
+        name = 'Body',
+        description = '',
+        type = bpy.types.Object
+    )
+    Weight : bpy.props.FloatProperty(
+        name = 'Weight',
+        description = "Vehicle Rigidbody Weight",
+        default = 1500,
+        step = 100,
+    )
+    DeformSpacingMultiplier : bpy.props.FloatProperty(
+        name = 'Deform Spacing Multiplier',
+        description = "Spacing between the deform mesh and the regular mesh",
+        default = 1.1,
+        step = 1,
+    )
+    DeformSubdivisions : bpy.props.FloatProperty(
+        name = 'Deform Voxel Size',
+        description = "Size of the voxels used on the remesh modifier",
+        default = 0.2,
+        step = 10,
+    )
+
+# Panel that will display the rig menu
+class VDS_PT_Body(Panel):
+    """The Body Panel"""
+    bl_label = "Body"
+    bl_idname = "OBJECT_PT_body"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_context = "objectmode"
+    bl_category = 'Vehicles Sim'
+
+    def draw(self, context):
+        layout = self.layout
+        scene = context.scene
+        bodyTool = scene.bodyTool
+
+        # Generate Rig button
+        # layout.label(text="Click do add a rig for the car wow")
+
+        layout.prop(bodyTool, "Body")
+        layout.prop(bodyTool, "Weight")
+        layout.prop(bodyTool, "DeformSpacingMultiplier")
+        layout.prop(bodyTool, "DeformSubdivisions")
 
 # UI List of all the assigned wheels
 class VDS_UL_wheels(UIList):
