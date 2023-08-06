@@ -593,6 +593,18 @@ class VDS_PT_Controls(Panel):
 #     def invoke(self, context, event):
 #         pass
 
+# UI List of all rigs in the scene
+class VDS_UL_rigs(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        obj = item.obj
+        vds_icon = "OUTLINER_OB_%s" % obj.type
+        split = layout.split(factor=0.1)
+        split.label(text="%d" % (index))
+        split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
+                
+    def invoke(self, context, event):
+        pass 
+
 # Properties for the Rig panel
 class VDS_PG_RigProperties(PropertyGroup):
     Body1 : bpy.props.PointerProperty(
@@ -616,9 +628,25 @@ class VDS_PT_Rig(Panel):
         scene = context.scene
         rigTool = scene.rigTool
 
-        # Generate Rig button
         # layout.label(text="Click do add a rig for the car wow")
-        layout.operator("vds.add_rig", text="Generate Rig", icon='AUTO')
+      
+        layout.label(text="Rig List")
+        rows = 4
+        row = layout.row()
+        row.template_list("VDS_UL_rigs", "", scene, "vds", scene, "rigsIndex", rows=rows)
+
+        # Buttons that control the list
+        col = row.column(align=True)
+        col.operator("vds.list_action", icon='ADD', text="").action = 'ADD'
+        col.operator("vds.list_action", icon='REMOVE', text="").action = 'REMOVE'
+        col.separator()
+        col.operator("vds.list_action", icon='TRIA_UP', text="").action = 'UP'
+        col.operator("vds.list_action", icon='TRIA_DOWN', text="").action = 'DOWN'
+        col.separator()
+        col.operator("vds.add_viewport_selection", icon="HAND") #LINENUMBERS_OFF, ANIM
+
+        # New Rig button
+        layout.operator("vds.add_rig", text="New Rig", icon='AUTO')
 
         # # Test Draw button
         # layout.label(text="Click to refresh draw the things wowza")
@@ -732,7 +760,7 @@ class VDS_PT_Wheel(Panel):
         col.operator("vds.add_viewport_selection", icon="HAND") #LINENUMBERS_OFF, ANIM
 
         # Suspension
-        # layout.prop(wheelTool, "obj")
+        layout.prop(wheelTool, "obj")
         layout.prop(wheelTool, "suspensionheight")
         layout.prop(wheelTool, "motorforce")
         layout.prop(wheelTool, "steerangle")
@@ -797,7 +825,7 @@ classes = (
     VDS_PG_ControlsProperties,
     VDS_PT_Controls,
     # Rig
-    VDS_UL_wheels,
+    VDS_UL_rigs,
     # VDS_UL_bodys,
     # VDS_UL_doors,
     VDS_PG_RigProperties,
@@ -806,6 +834,7 @@ classes = (
     VDS_PG_BodyProperties,
     VDS_PT_Body,
     # Wheel
+    VDS_UL_wheels,
     VDS_PG_wheelCollection,
     VDS_PT_Wheel,
     # Collection
@@ -824,6 +853,8 @@ def register():
     bpy.types.Scene.bodyTool = PointerProperty(type=VDS_PG_BodyProperties)
     bpy.types.Scene.rigTool = PointerProperty(type=VDS_PG_RigProperties)
     bpy.types.Scene.wheelsIndex = IntProperty()
+    bpy.types.Scene.rigsIndex = IntProperty()
+
     bpy.types.Scene.wheelTool = PointerProperty(type=VDS_PG_wheelCollection)
 
 def unregister():
@@ -836,6 +867,7 @@ def unregister():
     del bpy.types.Scene.bodyTool
     del bpy.types.Scene.rigTool
     del bpy.types.Scene.wheelsIndex
+    del bpy.types.Scene.rigsIndex
     del bpy.types.Scene.wheelTool
 
 if __name__ == "__main__":
