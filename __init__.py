@@ -10,7 +10,7 @@ bl_info={
     "category" : "Add Mesh",
 }
 
-
+# It's importing a lot more than it needs to. This was mostly to keep me from struggling over missing references instead of actually important bugs, but I should probably delete these in a bit
 import bpy
 import bmesh
 import math
@@ -21,9 +21,6 @@ from bpy.props import EnumProperty, PointerProperty, StringProperty, FloatProper
 from mathutils import Vector
 from bpy_extras.object_utils import AddObjectHelper, object_data_add
 from bpy.utils import register_class, unregister_class
-
-
-# bpy.data.texts["testlist"].as_module()
 
 class VDS_OT_AddRig(Operator):
     """Add a rig"""
@@ -149,7 +146,7 @@ class VDS_OT_AddRig(Operator):
 
         # Body
         bpy.ops.object.select_all(action='DESELECT')
-        body = scene.bodyTool.Body
+        body = scene.bodyProperties.Body
         moveToCollection(body, bodyMeshCollection)
 
         # Rig
@@ -212,11 +209,11 @@ class VDS_OT_AddRig(Operator):
         selectObject(bodyDeform)
         bpy.ops.object.modifier_add(type='REMESH')
         bpy.context.object.modifiers["Remesh"].mode = 'VOXEL'
-        bpy.context.object.modifiers["Remesh"].voxel_size = scene.bodyTool.DeformSubdivisions
+        bpy.context.object.modifiers["Remesh"].voxel_size = scene.bodyProperties.DeformSubdivisions
         bpy.ops.object.modifier_add(type='SHRINKWRAP')
         bpy.context.object.modifiers["Shrinkwrap"].target = body
         bpy.ops.object.convert(target='MESH')
-        bpy.ops.transform.resize(value=(scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier))
+        bpy.ops.transform.resize(value=(scene.bodyProperties.DeformSpacingMultiplier, scene.bodyProperties.DeformSpacingMultiplier, scene.bodyProperties.DeformSpacingMultiplier))
 
         bpy.ops.object.modifier_add(type='SMOOTH')
         bpy.context.object.modifiers["Smooth"].factor = 4
@@ -228,8 +225,8 @@ class VDS_OT_AddRig(Operator):
         # The fuck was I thinking here? This is going to add unneccessary vertices and possibly also break the mesh. Maybe it was because of my test mesh? Not sure
         # bpy.ops.object.modifier_add(type='SUBSURF')
         # bpy.context.object.modifiers["Subdivision"].subdivision_type = 'SIMPLE'
-        # bpy.context.object.modifiers["Subdivision"].levels = scene.bodyTool.DeformSubdivisions
-        # bpy.context.object.modifiers["Subdivision"].render_levels = scene.bodyTool.DeformSubdivisions
+        # bpy.context.object.modifiers["Subdivision"].levels = scene.bodyProperties.DeformSubdivisions
+        # bpy.context.object.modifiers["Subdivision"].render_levels = scene.bodyProperties.DeformSubdivisions
 
         bpy.ops.object.modifier_add(type='MESH_DEFORM')
         body.modifiers["MeshDeform"].object = bodyDeform
@@ -301,7 +298,6 @@ class VDS_OT_AddRig(Operator):
             bpy.context.object.rigid_body.mass = 15
 
             # Suspension Spring Constraint
-
             bpy.ops.object.empty_add(type='SPHERE', align='WORLD', location=(wheel.obj.location), rotation=(0, 0, 0), scale=(1, 1, 1))
             SuspensionConstraint = bpy.context.active_object
             SuspensionConstraint.name = wheel.obj.name + " Suspension Spring"
@@ -348,8 +344,6 @@ class VDS_OT_AddRig(Operator):
             bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
             bpy.context.object.rigid_body_constraint.object2 = wheelRigidbody
 
-
-
             # Motor Constraints
             # bpy.ops.object.empty_add(type='CONE', align='WORLD', location=(wheel.obj.location), rotation=(0, -1.5708, 0), scale=(1, 1, 1))
             # bpy.context.object.empty_display_size = 0.3
@@ -367,7 +361,6 @@ class VDS_OT_AddRig(Operator):
             # bpy.context.object.rigid_body_constraint.use_motor_ang = True
             # bpy.context.object.rigid_body_constraint.motor_ang_target_velocity = 1e+08
             # bpy.context.object.rigid_body_constraint.motor_ang_max_impulse = 1e+07
-
 
         return{'FINISHED'}
 
@@ -497,7 +490,6 @@ class VDS_OT_deleteObject(Operator):
 
 # -------------------------------------------------------------------
 #   Drawing
-# -------------------------------------------------------------------
 # Panel that will display the cusomizable options for the rig
 class VDS_PG_ControlsProperties(PropertyGroup):
     Steering : bpy.props.FloatProperty(
@@ -530,37 +522,15 @@ class VDS_PT_Controls(Panel):
         obj = context.object
         scene = context.scene
 
-        controlsTool = scene.controlsTool
+        controlsProperties = scene.controlsProperties
 
         layout.label(text = "The controls that you drive with")
 
-        layout.prop(controlsTool, "Steering")
-        layout.prop(controlsTool, "Motor")
-
-# class VDS_UL_bodys(UIList):
-#     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-#         obj = item.obj
-#         vds_icon = "OUTLINER_OB_%s" % obj.type
-#         split = layout.split(factor=0.1)
-#         split.label(text="%d" % (index))
-#         split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                
-#     def invoke(self, context, event):
-#         pass
-
-# class VDS_UL_doors(UIList):
-#     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-#         obj = item.obj
-#         vds_icon = "OUTLINER_OB_%s" % obj.type
-#         split = layout.split(factor=0.1)
-#         split.label(text="%d" % (index))
-#         split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                        
-#     def invoke(self, context, event):
-#         pass
+        layout.prop(controlsProperties, "Steering")
+        layout.prop(controlsProperties, "Motor")
 
 # UI List of all rigs in the scene
-class VDS_UL_rigs(UIList):
+class VDS_UL_RigList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         obj = item.obj
         vds_icon = "OUTLINER_OB_%s" % obj.type
@@ -590,7 +560,7 @@ class VDS_PT_Rig(Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        rigTool = scene.rigTool
+        rigProperties = scene.rigProperties
 
         # layout.label(text="Click do add a rig for the car wow")
       
@@ -668,18 +638,18 @@ class VDS_PT_Body(Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        bodyTool = scene.bodyTool
+        bodyProperties = scene.bodyProperties
 
         # Generate Rig button
         # layout.label(text="Click do add a rig for the car wow")
 
-        layout.prop(bodyTool, "Body")
-        layout.prop(bodyTool, "Weight")
-        layout.prop(bodyTool, "DeformSpacingMultiplier")
-        layout.prop(bodyTool, "DeformSubdivisions")
+        layout.prop(bodyProperties, "Body")
+        layout.prop(bodyProperties, "Weight")
+        layout.prop(bodyProperties, "DeformSpacingMultiplier")
+        layout.prop(bodyProperties, "DeformSubdivisions")
 
 # Property group AND collection used for the wheels
-class VDS_PG_wheelCollection(PropertyGroup):
+class VDS_PG_WheelProperties(PropertyGroup):
     obj : PointerProperty(
         name = "Object",
         type = bpy.types.Object
@@ -729,7 +699,7 @@ class VDS_PG_wheelCollection(PropertyGroup):
         step = 100,
     )
 # UI List of all the assigned wheels
-class VDS_UL_wheels(UIList):
+class VDS_UL_WheelList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         obj = item.obj
         vds_icon = "OUTLINER_OB_%s" % obj.type
@@ -759,7 +729,7 @@ class VDS_PT_Wheel(Panel):
         rows = 2
         row = layout.row()
         row.template_list(
-            "VDS_UL_wheels",
+            "VDS_UL_WheelList",
             "",
             scene,
             "vds",
@@ -767,7 +737,7 @@ class VDS_PT_Wheel(Panel):
             "wheelsIndex",
             rows=rows)
         # row.template_list(
-        #     listtype_name="VDS_UL_wheels",
+        #     listtype_name="VDS_UL_WheelList",
         #     list_id="Wheels ID",
         #     propname="camera_shakes",
         #     active_dataptr=scene,
@@ -797,27 +767,8 @@ class VDS_PT_Wheel(Panel):
         layout.prop(wheelTool, "motorforce")
         layout.prop(wheelTool, "steerangle")
 
-
-# -------------------------------------------------------------------
-#   Collection
-# -------------------------------------------------------------------
-# class VDS_PG_bodyCollection(PropertyGroup):
-# #name: StringProperty() -> Instantiated by default
-#     obj : PointerProperty(
-#         name = "Object",
-#         type = bpy.types.Object
-#     )
-
-# class VDS_PG_doorCollection(PropertyGroup):
-# #name: StringProperty() -> Instantiated by default
-#     obj : PointerProperty(
-#         name = "Object",
-#         type = bpy.types.Object
-#     )
-
 # -------------------------------------------------------------------
 #   Register & Unregister
-# -------------------------------------------------------------------
 classes = (
     # Operators
     VDS_OT_AddRig,
@@ -829,17 +780,23 @@ classes = (
     VDS_PG_ControlsProperties,
     VDS_PT_Controls,
     # Rig
-    # VDS_UL_bodys,
-    # VDS_UL_doors,
-    VDS_UL_rigs,
     VDS_PG_RigProperties,
+    VDS_UL_RigList,
     VDS_PT_Rig,
     # Body
     VDS_PG_BodyProperties,
     VDS_PT_Body,
+    # Door
+    # VDS_UL_DoorList,
+    # VDS_PG_DoorProperties,
+    # VDS_PT_Door,
     # Wheel
-    VDS_UL_wheels,
-    VDS_PG_wheelCollection,
+    VDS_PG_WheelProperties,
+    VDS_UL_WheelList,
+    VDS_PT_Wheel,
+    # Wheel
+    VDS_UL_WheelList,
+    VDS_PG_WheelProperties,
     VDS_PT_Wheel,
     # Collection
     # VDS_PG_bodyCollection,
@@ -852,27 +809,26 @@ def register():
         register_class(cls)
 
     # Custom scene properties
-    bpy.types.Scene.vds = CollectionProperty(type=VDS_PG_wheelCollection)
-    bpy.types.Scene.controlsTool = PointerProperty(type=VDS_PG_ControlsProperties)
-    bpy.types.Scene.bodyTool = PointerProperty(type=VDS_PG_BodyProperties)
-    bpy.types.Scene.rigTool = PointerProperty(type=VDS_PG_RigProperties)
+    bpy.types.Scene.controlsProperties = PointerProperty(type=VDS_PG_ControlsProperties)
+    bpy.types.Scene.rigProperties = PointerProperty(type=VDS_PG_RigProperties)
+    bpy.types.Scene.bodyProperties = PointerProperty(type=VDS_PG_BodyProperties)
+    bpy.types.Scene.wheelProperties = CollectionProperty(type=VDS_PG_WheelProperties)
+
     bpy.types.Scene.wheelsIndex = IntProperty()
     bpy.types.Scene.rigsIndex = IntProperty()
-
-    bpy.types.Scene.wheelTool = PointerProperty(type=VDS_PG_wheelCollection)
 
 def unregister():
     from bpy.utils import unregister_class
     for cls in reversed(classes):
         unregister_class(cls)
 
-    del bpy.types.Scene.vds
-    del bpy.types.Scene.controlsTool
-    del bpy.types.Scene.bodyTool
-    del bpy.types.Scene.rigTool
+    del bpy.types.Scene.controlsProperties
+    del bpy.types.Scene.rigProperties
+    del bpy.types.Scene.bodyProperties
+    del bpy.types.Scene.wheelProperties
+
     del bpy.types.Scene.wheelsIndex
     del bpy.types.Scene.rigsIndex
-    del bpy.types.Scene.wheelTool
 
 if __name__ == "__main__":
     register()
