@@ -22,7 +22,6 @@ from mathutils import Vector
 from bpy_extras.object_utils import AddObjectHelper, object_data_add
 from bpy.utils import register_class, unregister_class
 
-filename="D:/Documents/Code/VehicleDestructionSimulation/testlist.py"
 
 # bpy.data.texts["testlist"].as_module()
 
@@ -279,11 +278,11 @@ class VDS_OT_AddRig(Operator):
             keepTransformParent(wheel.obj, wheelRigidbody)
 
             bpy.ops.rigidbody.object_add()
-            bpy.context.object.rigid_body.mass = 100
+            bpy.context.object.rigid_body.mass = scene.wheelTool.wheelweight
             bpy.context.object.rigid_body.friction = 1
             bpy.context.object.rigid_body.restitution = 0.2
             bpy.context.object.rigid_body.linear_damping = 0.005
-            bpy.context.object.rigid_body.angular_damping = 0.001
+            bpy.context.object.rigid_body.angular_damping = 0.002
 
             # Suspension Rigidbody
             if wheel.obj.location.x < body.location.x:
@@ -332,8 +331,8 @@ class VDS_OT_AddRig(Operator):
             bpy.context.object.rigid_body_constraint.use_override_solver_iterations = True
             bpy.context.object.rigid_body_constraint.solver_iterations = 300
             bpy.context.object.rigid_body_constraint.use_spring_z = True
-            bpy.context.object.rigid_body_constraint.spring_stiffness_z = 50000
-            bpy.context.object.rigid_body_constraint.spring_damping_z = 1000
+            bpy.context.object.rigid_body_constraint.spring_stiffness_z = scene.wheelTool.suspensionstiffness
+            bpy.context.object.rigid_body_constraint.spring_damping_z = scene.wheelTool.suspensiondamping
             bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
             bpy.context.object.rigid_body_constraint.object2 = bodyRigidbody
 
@@ -499,8 +498,6 @@ class VDS_OT_deleteObject(Operator):
 # -------------------------------------------------------------------
 #   Drawing
 # -------------------------------------------------------------------
-
-# CONTROL MENU
 # Panel that will display the cusomizable options for the rig
 class VDS_PG_ControlsProperties(PropertyGroup):
     Steering : bpy.props.FloatProperty(
@@ -540,7 +537,6 @@ class VDS_PT_Controls(Panel):
         layout.prop(controlsTool, "Steering")
         layout.prop(controlsTool, "Motor")
 
-# RIG MENU
 # class VDS_UL_bodys(UIList):
 #     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
 #         obj = item.obj
@@ -574,7 +570,6 @@ class VDS_UL_rigs(UIList):
                 
     def invoke(self, context, event):
         pass 
-
 # Properties for the Rig panel
 class VDS_PG_RigProperties(PropertyGroup):
     Body1 : bpy.props.PointerProperty(
@@ -582,7 +577,6 @@ class VDS_PG_RigProperties(PropertyGroup):
         description = '',
         type = bpy.types.Object
     )
-
 # Panel that will display the rig menu
 class VDS_PT_Rig(Panel):
     """The Rig Panel"""
@@ -661,8 +655,7 @@ class VDS_PG_BodyProperties(PropertyGroup):
         default = 0.2,
         step = 10,
     )
-
-# Panel that will display the rig menu
+# Panel that will display the body menu
 class VDS_PT_Body(Panel):
     """The Body Panel"""
     bl_label = "Body"
@@ -691,10 +684,10 @@ class VDS_PG_wheelCollection(PropertyGroup):
         name = "Object",
         type = bpy.types.Object
     )
-    weight : bpy.props.FloatProperty(
-        name = "Suspension Max",
+    wheelweight : bpy.props.FloatProperty(
+        name = "Wheel Weight",
         description = "The weight of the individual wheel",
-        default = 15,
+        default = 100,
         step = 10,
     )
     suspensionmin : bpy.props.FloatProperty(
@@ -709,7 +702,18 @@ class VDS_PG_wheelCollection(PropertyGroup):
         default = 0.2,
         step = 1,
     )
-    
+    suspensionstiffness : bpy.props.FloatProperty(
+        name = "Suspension Stiffness",
+        description = "The force the suspension uses",
+        default = 50000,
+        step = 100,
+    )
+    suspensiondamping : bpy.props.FloatProperty(
+        name = "Suspension Damping",
+        description = "The amount the suspension is allowed to bounce back and forth (bad explanation)",
+        default = 1000,
+        step = 100,
+    )
     motorforce : bpy.props.FloatProperty(
         name = "Motor Torque",
         description = "The amount of torque that the wheel has",
@@ -785,9 +789,11 @@ class VDS_PT_Wheel(Panel):
         # col = row.column(align=True)
         # col.prop(shake, "shake_type", text="Shake")
         layout.prop(wheelTool, "obj")
-        layout.prop(wheelTool, "weight")
+        layout.prop(wheelTool, "wheelweight")
         layout.prop(wheelTool, "suspensionmax")
         layout.prop(wheelTool, "suspensionmin")
+        layout.prop(wheelTool, "suspensionstiffness")
+        layout.prop(wheelTool, "suspensiondamping")
         layout.prop(wheelTool, "motorforce")
         layout.prop(wheelTool, "steerangle")
 
@@ -795,7 +801,6 @@ class VDS_PT_Wheel(Panel):
 # -------------------------------------------------------------------
 #   Collection
 # -------------------------------------------------------------------
-
 # class VDS_PG_bodyCollection(PropertyGroup):
 # #name: StringProperty() -> Instantiated by default
 #     obj : PointerProperty(
@@ -810,12 +815,9 @@ class VDS_PT_Wheel(Panel):
 #         type = bpy.types.Object
 #     )
 
-
-
 # -------------------------------------------------------------------
 #   Register & Unregister
 # -------------------------------------------------------------------
-
 classes = (
     # Operators
     VDS_OT_AddRig,
