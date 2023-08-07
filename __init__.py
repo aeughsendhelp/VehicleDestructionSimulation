@@ -691,11 +691,11 @@ class VDS_PG_wheelCollection(PropertyGroup):
         name = "Object",
         type = bpy.types.Object
     )
-    suspensionmax : bpy.props.FloatProperty(
+    weight : bpy.props.FloatProperty(
         name = "Suspension Max",
-        description = "The maximum distance the suspension can travel",
-        default = 0.2,
-        step = 1,
+        description = "The weight of the individual wheel",
+        default = 15,
+        step = 10,
     )
     suspensionmin : bpy.props.FloatProperty(
         name = "Suspension Min",
@@ -703,6 +703,13 @@ class VDS_PG_wheelCollection(PropertyGroup):
         default = -0.23,
         step = 1,
     )
+    suspensionmax : bpy.props.FloatProperty(
+        name = "Suspension Max",
+        description = "The maximum distance the suspension can travel",
+        default = 0.2,
+        step = 1,
+    )
+    
     motorforce : bpy.props.FloatProperty(
         name = "Motor Torque",
         description = "The amount of torque that the wheel has",
@@ -743,7 +750,6 @@ class VDS_PT_Wheel(Panel):
         layout = self.layout
         obj = context.object
         scene = context.scene
-
       
         layout.label(text="Wheel List")
         rows = 2
@@ -779,6 +785,7 @@ class VDS_PT_Wheel(Panel):
         # col = row.column(align=True)
         # col.prop(shake, "shake_type", text="Shake")
         layout.prop(wheelTool, "obj")
+        layout.prop(wheelTool, "weight")
         layout.prop(wheelTool, "suspensionmax")
         layout.prop(wheelTool, "suspensionmin")
         layout.prop(wheelTool, "motorforce")
