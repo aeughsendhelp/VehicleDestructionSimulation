@@ -1,0 +1,24 @@
+_______
+Rig
+|0  BL Wheel       |  |+|
+|1  BL Wheel       |  |-|
+|                  |  |^|
+|                  |  |^|
+|   New Rig             |
+_______
+Body
+|   Weight              |
+|   Weight              |
+|   Weight              |
+_______
+Wheel
+|0  BL Wheel       |  |+|
+|1  BL Wheel       |  |-|
+|2  BL Wheel       |  |^|
+|3  BL Wheel       |  |^|
+|                  |  |%|
+|Suspension Height   0.0|
+|Suspension Force    0.0|
+|Suspension Damping  0.0|
+|Motor Torque        0.0|
+|Steer Angle         0.0|
