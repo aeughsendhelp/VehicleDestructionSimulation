@@ -10,7 +10,6 @@ bl_info={
     "category" : "Add Mesh",
 }
 
-
 import bpy
 import bmesh
 import math
@@ -22,8 +21,6 @@ from mathutils import Vector
 from bpy_extras.object_utils import AddObjectHelper, object_data_add
 from bpy.utils import register_class, unregister_class
 
-
-# bpy.data.texts["testlist"].as_module()
 
 class VDS_OT_AddRig(Operator):
     """Add a rig"""
@@ -149,7 +146,7 @@ class VDS_OT_AddRig(Operator):
 
         # Body
         bpy.ops.object.select_all(action='DESELECT')
-        body = scene.bodyTool.Body
+        body = scene.bodyProperties.Body
         moveToCollection(body, bodyMeshCollection)
 
         # Rig
@@ -212,11 +209,11 @@ class VDS_OT_AddRig(Operator):
         selectObject(bodyDeform)
         bpy.ops.object.modifier_add(type='REMESH')
         bpy.context.object.modifiers["Remesh"].mode = 'VOXEL'
-        bpy.context.object.modifiers["Remesh"].voxel_size = scene.bodyTool.DeformSubdivisions
+        bpy.context.object.modifiers["Remesh"].voxel_size = scene.bodyProperties.DeformSubdivisions
         bpy.ops.object.modifier_add(type='SHRINKWRAP')
         bpy.context.object.modifiers["Shrinkwrap"].target = body
         bpy.ops.object.convert(target='MESH')
-        bpy.ops.transform.resize(value=(scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier, scene.bodyTool.DeformSpacingMultiplier))
+        bpy.ops.transform.resize(value=(scene.bodyProperties.DeformSpacingMultiplier, scene.bodyProperties.DeformSpacingMultiplier, scene.bodyProperties.DeformSpacingMultiplier))
 
         bpy.ops.object.modifier_add(type='SMOOTH')
         bpy.context.object.modifiers["Smooth"].factor = 4
@@ -228,8 +225,8 @@ class VDS_OT_AddRig(Operator):
         # The fuck was I thinking here? This is going to add unneccessary vertices and possibly also break the mesh. Maybe it was because of my test mesh? Not sure
         # bpy.ops.object.modifier_add(type='SUBSURF')
         # bpy.context.object.modifiers["Subdivision"].subdivision_type = 'SIMPLE'
-        # bpy.context.object.modifiers["Subdivision"].levels = scene.bodyTool.DeformSubdivisions
-        # bpy.context.object.modifiers["Subdivision"].render_levels = scene.bodyTool.DeformSubdivisions
+        # bpy.context.object.modifiers["Subdivision"].levels = scene.bodyProperties.DeformSubdivisions
+        # bpy.context.object.modifiers["Subdivision"].render_levels = scene.bodyProperties.DeformSubdivisions
 
         bpy.ops.object.modifier_add(type='MESH_DEFORM')
         body.modifiers["MeshDeform"].object = bodyDeform
@@ -278,7 +275,7 @@ class VDS_OT_AddRig(Operator):
             keepTransformParent(wheel.obj, wheelRigidbody)
 
             bpy.ops.rigidbody.object_add()
-            bpy.context.object.rigid_body.mass = scene.wheelTool.wheelweight
+            bpy.context.object.rigid_body.mass = scene.wheelProperties.wheelweight
             bpy.context.object.rigid_body.friction = 1
             bpy.context.object.rigid_body.restitution = 0.2
             bpy.context.object.rigid_body.linear_damping = 0.005
@@ -286,9 +283,11 @@ class VDS_OT_AddRig(Operator):
 
             # Suspension Rigidbody
             if wheel.obj.location.x < body.location.x:
-                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x + 0.6, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, -0.392699, 0), scale=(0.5, 0.1, 0.1))
+                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x + scene.suspensionProperties.suspensionoffset, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, -0.392699, 0), scale=(scene.wheelProperties.suspensionwidth, 0.05, 0.05))
             else:
-                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x - 0.6, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, 0.392699, 0), scale=(0.5, 0.1, 0.1))
+                bpy.ops.mesh.primitive_cube_add(size=1, enter_editmode=False, align='WORLD', location=(Vector((wheel.obj.location.x - scene.suspensionProperties.suspensionoffset, wheel.obj.location.y, wheel.obj.location.z + 0.1))), rotation=(0, 0.392699, 0), scale=(scene.wheelProperties.suspensionwidth, 0.05, 0.05))
+
+            print(scene.suspensionProperties.suspensionoffset)
 
             suspensionRigidbody = bpy.context.active_object
             selectObject(suspensionRigidbody)
@@ -326,13 +325,13 @@ class VDS_OT_AddRig(Operator):
             bpy.context.object.rigid_body_constraint.limit_lin_y_lower = 0
             bpy.context.object.rigid_body_constraint.limit_lin_y_upper = 0
             bpy.context.object.rigid_body_constraint.limit_lin_x_lower = 0
-            bpy.context.object.rigid_body_constraint.limit_lin_z_upper = scene.wheelTool.suspensionmax
-            bpy.context.object.rigid_body_constraint.limit_lin_z_lower = scene.wheelTool.suspensionmin
+            bpy.context.object.rigid_body_constraint.limit_lin_z_upper = scene.suspensionProperties.suspensionmax
+            bpy.context.object.rigid_body_constraint.limit_lin_z_lower = scene.suspensionProperties.suspensionmin
             bpy.context.object.rigid_body_constraint.use_override_solver_iterations = True
             bpy.context.object.rigid_body_constraint.solver_iterations = 300
             bpy.context.object.rigid_body_constraint.use_spring_z = True
-            bpy.context.object.rigid_body_constraint.spring_stiffness_z = scene.wheelTool.suspensionstiffness
-            bpy.context.object.rigid_body_constraint.spring_damping_z = scene.wheelTool.suspensiondamping
+            bpy.context.object.rigid_body_constraint.spring_stiffness_z = scene.suspensionProperties.suspensionstiffness
+            bpy.context.object.rigid_body_constraint.spring_damping_z = scene.suspensionProperties.suspensiondamping
             bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
             bpy.context.object.rigid_body_constraint.object2 = bodyRigidbody
 
@@ -347,7 +346,6 @@ class VDS_OT_AddRig(Operator):
             bpy.context.object.rigid_body_constraint.type = 'HINGE'
             bpy.context.object.rigid_body_constraint.object1 = suspensionRigidbody
             bpy.context.object.rigid_body_constraint.object2 = wheelRigidbody
-
 
 
             # Motor Constraints
@@ -371,9 +369,9 @@ class VDS_OT_AddRig(Operator):
 
         return{'FINISHED'}
 
-class VDS_OT_actions(Operator):
+class VDS_OT_wheelActions(Operator):
     """Move items up and down, add and remove"""
-    bl_idname = "vds.list_action"
+    bl_idname = "vds.wheel_action"
     bl_label = ""
     bl_description = "Add, remove, and reorganize items"
     bl_options = {'REGISTER'}
@@ -432,71 +430,67 @@ class VDS_OT_actions(Operator):
             #     self.report({'INFO'}, "Nothing selected in the Viewport")
         return {"FINISHED"}
 
-class VDS_OT_addViewportSelection(Operator):
-    """Add all items currently selected in the viewport"""
-    bl_idname = "vds.add_viewport_selection"
+class VDS_OT_doorActions(Operator):
+    """Move items up and down, add and remove"""
+    bl_idname = "vds.door_action"
     bl_label = ""
-    bl_description = "Add all items currently selected in the viewport"
-    bl_options = {'REGISTER', 'UNDO'}
+    bl_description = "Add, remove, and reorganize items"
+    bl_options = {'REGISTER'}
         
-    def execute(self, context):
-        scene = context.scene
-        selected_objs = context.selected_objects
-        if selected_objs:
-            new_objs = []
-            for i in selected_objs:
-                item = scene.vds.add()
-                item.name = i.name
-                item.obj = i
-                new_objs.append(item.name)
-            info=', '.join(map(str, new_objs))
-            self.report({'INFO'}, 'Added: "%s"' % (info))
-        else:
-            self.report({'INFO'}, "Nothing selected in the Viewport")
-        return{'FINISHED'}
-
-class VDS_OT_deleteObject(Operator):
-    """Delete object from scene"""
-    bl_idname = "vds.delete_object"
-    bl_label = ""
-    bl_description = "Remove object from scene"
-    bl_options = {'REGISTER', 'UNDO'}
-
-    @classmethod
-    def poll(cls, context):
-        return bool(context.scene.vds)
+    action : bpy.props.EnumProperty(
+        items=(
+            ('UP', "Up", ""),
+            ('DOWN', "Down", ""),
+            ('REMOVE', "Remove", ""),
+            ('ADD', "Add", "")))
 
     def invoke(self, context, event):
-        return context.window_manager.invoke_confirm(self, event)
-            
-    def execute(self, context):
         scene = context.scene
-        selected_objs = context.selected_objects
-        idx = scene.wheelsIndex
+        idx = scene.doorsIndex
+
         try:
-            item = scene.vds[idx]
-            print(item)
+            item = scene.doorProperties[idx]
         except IndexError:
             pass
         else:
-            ob = scene.objects.get(item.obj.name)
-            print(ob)
-            if not ob:
-                self.report({'INFO'}, "No object of that name found in scene")
-                return {"CANCELLED"}
-            else:
-                bpy.ops.object.select_all(action='DESELECT')
-                ob.select_set(True)
-                bpy.ops.object.delete()
-                    
-            info = ' Item "%s" removed from Scene' % (len(selected_objs))
-            scene.wheelsIndex -= 1
-            scene.vds.remove(idx)
-            self.report({'INFO'}, info)
-        return{'FINISHED'}
+            if self.action == 'DOWN' and idx < len(scene.doorProperties) - 1:
+                item_next = scene.doorProperties[idx+1].name
+                scene.doorProperties.move(idx, idx+1)
+                scene.doorsIndex += 1
+                info = 'Item "%s" moved to position %d' % (item.name, scene.wheelsIndex + 1)
+                self.report({'INFO'}, info)
 
-# -------------------------------------------------------------------
-#   Drawing
+            elif self.action == 'UP' and idx >= 1:
+                item_prev = scene.doorProperties[idx-1].name
+                scene.doorProperties.move(idx, idx-1)
+                scene.doorsIndex -= 1
+                info='Item "%s" moved to position %d' % (item.name, scene.wheelsIndex + 1)
+                self.report({'INFO'}, info)
+
+            elif self.action == 'REMOVE':
+                info = 'Item "%s" removed from list' % (scene.doorProperties[idx].name)
+                scene.doorsIndex -= 1
+                scene.doorProperties.remove(idx)
+                self.report({'INFO'}, info)
+                    
+        if self.action == 'ADD':
+            item = scene.doorProperties.add()
+            item.name = context.object.name
+
+            scene.doorsIndex = len(scene.doorProperties) - 1
+            info = '"%s" added to list' % (item.name)
+            self.report({'INFO'}, info)
+            # if context.object:
+            #     # item = scene.vds.add()
+            #     # item.name = context.object.name
+            #     # item.obj = context.object
+            #     # item.suspensionheight = 15
+            #     # print(item)
+
+            # else:
+            #     self.report({'INFO'}, "Nothing selected in the Viewport")
+        return {"FINISHED"}
+
 # -------------------------------------------------------------------
 # Panel that will display the cusomizable options for the rig
 class VDS_PG_ControlsProperties(PropertyGroup):
@@ -530,37 +524,15 @@ class VDS_PT_Controls(Panel):
         obj = context.object
         scene = context.scene
 
-        controlsTool = scene.controlsTool
+        controlsProperties = scene.controlsProperties
 
         layout.label(text = "The controls that you drive with")
 
-        layout.prop(controlsTool, "Steering")
-        layout.prop(controlsTool, "Motor")
-
-# class VDS_UL_bodys(UIList):
-#     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-#         obj = item.obj
-#         vds_icon = "OUTLINER_OB_%s" % obj.type
-#         split = layout.split(factor=0.1)
-#         split.label(text="%d" % (index))
-#         split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                
-#     def invoke(self, context, event):
-#         pass
-
-# class VDS_UL_doors(UIList):
-#     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-#         obj = item.obj
-#         vds_icon = "OUTLINER_OB_%s" % obj.type
-#         split = layout.split(factor=0.1)
-#         split.label(text="%d" % (index))
-#         split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                        
-#     def invoke(self, context, event):
-#         pass
+        layout.prop(controlsProperties, "Steering")
+        layout.prop(controlsProperties, "Motor")
 
 # UI List of all rigs in the scene
-class VDS_UL_rigs(UIList):
+class VDS_UL_RigList(UIList):
     def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
         obj = item.obj
         vds_icon = "OUTLINER_OB_%s" % obj.type
@@ -572,8 +544,8 @@ class VDS_UL_rigs(UIList):
         pass 
 # Properties for the Rig panel
 class VDS_PG_RigProperties(PropertyGroup):
-    Body1 : bpy.props.PointerProperty(
-        name = 'Body',
+    Rig : bpy.props.PointerProperty(
+        name = 'Rig',
         description = '',
         type = bpy.types.Object
     )
@@ -590,14 +562,14 @@ class VDS_PT_Rig(Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        rigTool = scene.rigTool
+        rigProperties = scene.rigProperties
 
         # layout.label(text="Click do add a rig for the car wow")
       
         # layout.label(text="Rig List")
         # rows = 4
         # row = layout.row()
-        # row.template_list("VDS_UL_rigs", "", scene, "vds", scene, "rigsIndex", rows=rows)
+        # row.template_list("VDS_UL_RigList", "", scene, "vds", scene, "rigsIndex", rows=rows)
 
         # # Buttons that control the list
         # col = row.column(align=True)
@@ -668,18 +640,84 @@ class VDS_PT_Body(Panel):
     def draw(self, context):
         layout = self.layout
         scene = context.scene
-        bodyTool = scene.bodyTool
+        bodyProperties = scene.bodyProperties
 
-        # Generate Rig button
-        # layout.label(text="Click do add a rig for the car wow")
-
-        layout.prop(bodyTool, "Body")
-        layout.prop(bodyTool, "Weight")
-        layout.prop(bodyTool, "DeformSpacingMultiplier")
-        layout.prop(bodyTool, "DeformSubdivisions")
+        layout.prop(bodyProperties, "Body")
+        layout.prop(bodyProperties, "Weight")
+        layout.prop(bodyProperties, "DeformSpacingMultiplier")
+        layout.prop(bodyProperties, "DeformSubdivisions")
 
 # Property group AND collection used for the wheels
-class VDS_PG_wheelCollection(PropertyGroup):
+class VDS_PG_DoorProperties(PropertyGroup):
+    obj : PointerProperty(
+        name = "Object",
+        type = bpy.types.Object
+    )
+    breakforce : bpy.props.FloatProperty(
+        name = "Break Force",
+        description = "The amount of force needed to break the joint",\
+        # This default is bad, I need to make it better
+        default = 0,
+        # Same with step, I'm gonna need 
+        step = 10,
+    )
+    # Add a parameter for the axis that the joint is aligned to
+    # breakforce : bpy.props.FloatProperty(
+    #     name = "Break Force",
+    #     description = "The amount of force needed to break the joint",\
+    #     # This default is bad, I need to make it better
+    #     default = 0,
+    #     # Same with step, I'm gonna need 
+    #     step = 10,
+    # )
+# UI List of all the assigned wheels
+class VDS_UL_DoorList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item.obj != None:
+            obj = item.obj
+            vds_icon = "OUTLINER_OB_%s" % obj.type
+            split = layout.split(factor=0.1)
+            split.label(text="%d" % (index))
+            split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
+                
+    def invoke(self, context, event):
+        pass
+# Panel that will display the wheel menu
+class VDS_PT_Door(Panel):
+    """The Door Panel"""
+    bl_label = "Door"
+    bl_idname = "OBJECT_PT_doorproperties"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Vehicle Sim'
+    bl_context = "objectmode"
+    bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.object
+        scene = context.scene
+    
+        layout.label(text="Door List")
+        row = layout.row()
+        row.template_list("VDS_UL_DoorList", "", scene, "doorProperties", scene, "doorsIndex", rows = 4)
+
+        # Buttons that control the list
+        col = row.column(align=True)
+        col.operator("vds.door_action", icon='ADD', text="").action = 'ADD'
+        col.operator("vds.door_action", icon='REMOVE', text="").action = 'REMOVE'
+        col.separator()
+        col.operator("vds.door_action", icon='TRIA_UP', text="").action = 'UP'
+        col.operator("vds.door_action", icon='TRIA_DOWN', text="").action = 'DOWN'
+
+        # Suspension
+        doorProperties = scene.doorProperties[scene.doorsIndex]
+
+        layout.prop(doorProperties, "obj")
+        layout.prop(doorProperties, "breakforce")
+
+# Property group AND collection used for the wheels
+class VDS_PG_WheelProperties(PropertyGroup):
     obj : PointerProperty(
         name = "Object",
         type = bpy.types.Object
@@ -690,6 +728,96 @@ class VDS_PG_wheelCollection(PropertyGroup):
         default = 100,
         step = 10,
     )
+    motorforce : bpy.props.FloatProperty(
+        name = "Motor Torque",
+        description = "The amount of torque that the wheel has",
+        default = 1000,
+        step = 100,
+    )
+    steerangle : bpy.props.FloatProperty(
+        name = "Steer Angle",
+        description = "How far the wheel turns",
+        max = 360,
+        min = -360,
+        default = 0,
+        step = 100,
+    )
+    breakforce : bpy.props.FloatProperty(
+        name = "Break Force",
+        description = "The amount of force needed to break the joint",\
+        # This default is bad, I need to make it better
+        default = 0,
+        # Same with step, I'm gonna need 
+        step = 10,
+    )
+# UI List of all the assigned wheels
+class VDS_UL_WheelList(UIList):
+    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
+        if item.obj != None:
+            obj = item.obj
+            vds_icon = "OUTLINER_OB_%s" % obj.type
+            split = layout.split(factor=0.1)
+            split.label(text="%d" % (index))
+            split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
+                
+    def invoke(self, context, event):
+        pass
+# Panel that will display the wheel menu
+class VDS_PT_Wheel(Panel):
+    """The Wheel Panel"""
+    bl_label = "Wheel"
+    bl_idname = "OBJECT_PT_wheelpanel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Vehicle Sim'
+    bl_context = "objectmode"
+    # bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.object
+        scene = context.scene
+      
+        layout.label(text="Wheel List")
+        row = layout.row()
+        row.template_list("VDS_UL_WheelList", "", scene, "vds", scene, "wheelsIndex", rows = 4)
+
+        # Buttons that control the list
+        col = row.column(align=True)
+        col.operator("vds.wheel_action", icon='ADD', text="").action = 'ADD'
+        col.operator("vds.wheel_action", icon='REMOVE', text="").action = 'REMOVE'
+        col.separator()
+        col.operator("vds.wheel_action", icon='TRIA_UP', text="").action = 'UP'
+        col.operator("vds.wheel_action", icon='TRIA_DOWN', text="").action = 'DOWN'
+
+class VDS_PT_WheelProps(Panel):
+    """The Wheel Props Panel"""
+    bl_label = "Wheels"
+    bl_idname = "OBJECT_PT_wheelprops"
+    bl_parent_id = "OBJECT_PT_wheelpanel"
+    bl_space_type = 'VIEW_3D'
+    bl_region_type = 'UI'
+    bl_category = 'Vehicle Sim'
+    bl_context = "objectmode"
+    # bl_options = {'DEFAULT_CLOSED'}
+
+    def draw(self, context):
+        layout = self.layout
+        obj = context.object
+        scene = context.scene
+            
+        row = layout.row()
+
+        wheelProperties = scene.vds[scene.wheelsIndex]
+
+        layout.prop(wheelProperties, "obj")
+        layout.prop(wheelProperties, "wheelweight")
+        layout.prop(wheelProperties, "breakforce")
+        layout.prop(wheelProperties, "motorforce")
+        layout.prop(wheelProperties, "steerangle")
+
+
+class VDS_PG_SuspensionProperties(PropertyGroup):
     suspensionmin : bpy.props.FloatProperty(
         name = "Suspension Min",
         description = "The minimum distance the suspension can travel",
@@ -714,36 +842,24 @@ class VDS_PG_wheelCollection(PropertyGroup):
         default = 1000,
         step = 100,
     )
-    motorforce : bpy.props.FloatProperty(
-        name = "Motor Torque",
-        description = "The amount of torque that the wheel has",
-        default = 1000,
-        step = 1,
+    suspensionwidth : bpy.props.FloatProperty(
+        name = "Suspension Width",
+        description = "The maximum distance the suspension can travel",
+        default = 0.2,
+        step = 10,
     )
-    steerangle : bpy.props.FloatProperty(
-        name = "Steer Angle",
-        description = "How far the wheel turns",
-        max = 360,
-        min = -360,
-        default = 0,
-        step = 100,
+    suspensionoffset : bpy.props.FloatProperty(
+        name = "Suspension Offset",
+        description = "The maximum distance the suspension can travel",
+        default = 0.2,
+        step = 10,
     )
 # UI List of all the assigned wheels
-class VDS_UL_wheels(UIList):
-    def draw_item(self, context, layout, data, item, icon, active_data, active_propname, index):
-        obj = item.obj
-        vds_icon = "OUTLINER_OB_%s" % obj.type
-        split = layout.split(factor=0.1)
-        split.label(text="%d" % (index))
-        split.prop(obj, "name", text="", emboss=False, translate=False, icon=vds_icon)
-                
-    def invoke(self, context, event):
-        pass
-# Panel that will display the wheel menu
-class VDS_PT_Wheel(Panel):
-    """The Wheel Panel"""
-    bl_label = "Wheel"
-    bl_idname = "OBJECT_PT_wheelproperties"
+class VDS_PT_Suspension(Panel):
+    """The Suspension Props Panel"""
+    bl_label = "Suspension"
+    bl_idname = "OBJECT_PT_suspensionprops"
+    bl_parent_id = "OBJECT_PT_wheelpanel"
     bl_space_type = 'VIEW_3D'
     bl_region_type = 'UI'
     bl_category = 'Vehicle Sim'
@@ -754,96 +870,45 @@ class VDS_PT_Wheel(Panel):
         layout = self.layout
         obj = context.object
         scene = context.scene
-      
-        layout.label(text="Wheel List")
-        rows = 2
+        
         row = layout.row()
-        row.template_list(
-            "VDS_UL_wheels",
-            "",
-            scene,
-            "vds",
-            scene,
-            "wheelsIndex",
-            rows=rows)
-        # row.template_list(
-        #     listtype_name="VDS_UL_wheels",
-        #     list_id="Wheels ID",
-        #     propname="camera_shakes",
-        #     active_dataptr=scene,
-        #     active_propname="wheelsIndex",
-        # )
 
-        # Buttons that control the list
-        col = row.column(align=True)
-        col.operator("vds.list_action", icon='ADD', text="").action = 'ADD'
-        col.operator("vds.list_action", icon='REMOVE', text="").action = 'REMOVE'
-        col.separator()
-        col.operator("vds.list_action", icon='TRIA_UP', text="").action = 'UP'
-        col.operator("vds.list_action", icon='TRIA_DOWN', text="").action = 'DOWN'
-        col.separator()
-        col.operator("vds.add_viewport_selection", icon="HAND") #LINENUMBERS_OFF, ANIM
+        suspensionProperties = scene.suspensionProperties[scene.wheelsIndex]
 
-        # Suspension
-        wheelTool = scene.vds[scene.wheelsIndex]
-        # col = row.column(align=True)
-        # col.prop(shake, "shake_type", text="Shake")
-        layout.prop(wheelTool, "obj")
-        layout.prop(wheelTool, "wheelweight")
-        layout.prop(wheelTool, "suspensionmax")
-        layout.prop(wheelTool, "suspensionmin")
-        layout.prop(wheelTool, "suspensionstiffness")
-        layout.prop(wheelTool, "suspensiondamping")
-        layout.prop(wheelTool, "motorforce")
-        layout.prop(wheelTool, "steerangle")
+        layout.prop(suspensionProperties, "suspensionmax")
+        layout.prop(suspensionProperties, "suspensionmin")
+        layout.prop(suspensionProperties, "suspensionstiffness")
+        layout.prop(suspensionProperties, "suspensiondamping")
+        layout.prop(suspensionProperties, "suspensionwidth")
+        layout.prop(suspensionProperties, "suspensionoffset")
 
-
-# -------------------------------------------------------------------
-#   Collection
-# -------------------------------------------------------------------
-# class VDS_PG_bodyCollection(PropertyGroup):
-# #name: StringProperty() -> Instantiated by default
-#     obj : PointerProperty(
-#         name = "Object",
-#         type = bpy.types.Object
-#     )
-
-# class VDS_PG_doorCollection(PropertyGroup):
-# #name: StringProperty() -> Instantiated by default
-#     obj : PointerProperty(
-#         name = "Object",
-#         type = bpy.types.Object
-#     )
-
-# -------------------------------------------------------------------
-#   Register & Unregister
 # -------------------------------------------------------------------
 classes = (
     # Operators
     VDS_OT_AddRig,
-    VDS_OT_actions,
-    VDS_OT_addViewportSelection,
-    VDS_OT_deleteObject,
-    # VDS_OT_testDraw,
+    VDS_OT_wheelActions,
+    VDS_OT_doorActions,
     # Controls
     VDS_PG_ControlsProperties,
     VDS_PT_Controls,
     # Rig
-    # VDS_UL_bodys,
-    # VDS_UL_doors,
-    VDS_UL_rigs,
     VDS_PG_RigProperties,
+    VDS_UL_RigList,
     VDS_PT_Rig,
     # Body
     VDS_PG_BodyProperties,
     VDS_PT_Body,
+    # Door
+    VDS_PG_DoorProperties,
+    VDS_UL_DoorList,
+    VDS_PT_Door,
     # Wheel
-    VDS_UL_wheels,
-    VDS_PG_wheelCollection,
+    VDS_PG_WheelProperties,
+    VDS_UL_WheelList,
     VDS_PT_Wheel,
-    # Collection
-    # VDS_PG_bodyCollection,
-    # VDS_PG_doorCollection,
+    VDS_PT_WheelProps,
+    VDS_PG_SuspensionProperties,
+    VDS_PT_Suspension,
 )
 
 def register():
@@ -852,27 +917,35 @@ def register():
         register_class(cls)
 
     # Custom scene properties
-    bpy.types.Scene.vds = CollectionProperty(type=VDS_PG_wheelCollection)
-    bpy.types.Scene.controlsTool = PointerProperty(type=VDS_PG_ControlsProperties)
-    bpy.types.Scene.bodyTool = PointerProperty(type=VDS_PG_BodyProperties)
-    bpy.types.Scene.rigTool = PointerProperty(type=VDS_PG_RigProperties)
-    bpy.types.Scene.wheelsIndex = IntProperty()
-    bpy.types.Scene.rigsIndex = IntProperty()
+    bpy.types.Scene.controlsProperties = PointerProperty(type=VDS_PG_ControlsProperties)
+    bpy.types.Scene.rigProperties = PointerProperty(type=VDS_PG_RigProperties)
+    bpy.types.Scene.bodyProperties = PointerProperty(type=VDS_PG_BodyProperties)
+    bpy.types.Scene.wheelProperties = PointerProperty(type=VDS_PG_WheelProperties)
 
-    bpy.types.Scene.wheelTool = PointerProperty(type=VDS_PG_wheelCollection)
+    bpy.types.Scene.suspensionProperties = CollectionProperty(type=VDS_PG_SuspensionProperties)
+    bpy.types.Scene.doorProperties = CollectionProperty(type=VDS_PG_DoorProperties)
+    bpy.types.Scene.vds = CollectionProperty(type=VDS_PG_WheelProperties) # This one, called vds, should actually be called wheelCollection. I need to change that, but every time I ctrl f and replace, it ends up breaking. It compiles fine without this change, so this is a problem for future me.
+
+
+    bpy.types.Scene.rigsIndex = IntProperty()
+    bpy.types.Scene.doorsIndex = IntProperty()
+    bpy.types.Scene.wheelsIndex = IntProperty()
 
 def unregister():
     from bpy.utils import unregister_class
     for cls in reversed(classes):
         unregister_class(cls)
 
+    del bpy.types.Scene.rigProperties
+    del bpy.types.Scene.controlsProperties
+    del bpy.types.Scene.bodyProperties
+    del bpy.types.Scene.doorProperties
+    # Should be called wheelProperties
     del bpy.types.Scene.vds
-    del bpy.types.Scene.controlsTool
-    del bpy.types.Scene.bodyTool
-    del bpy.types.Scene.rigTool
-    del bpy.types.Scene.wheelsIndex
+
     del bpy.types.Scene.rigsIndex
-    del bpy.types.Scene.wheelTool
+    del bpy.types.Scene.doorsIndex
+    del bpy.types.Scene.wheelsIndex
 
 if __name__ == "__main__":
     register()
